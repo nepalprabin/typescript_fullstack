@@ -60,18 +60,56 @@ UserResponse = __decorate([
 ], UserResponse);
 let UserResolver = class UserResolver {
     async register(options, { em }) {
+        if (options.username.length < 2) {
+            return {
+                errors: [
+                    {
+                        field: "username",
+                        message: "Length of username must be greater than 2",
+                    },
+                ],
+            };
+        }
+        if (options.password.length < 5) {
+            return {
+                errors: [
+                    {
+                        field: "password",
+                        message: "Length of password must be greater than 5",
+                    },
+                ],
+            };
+        }
         const hashedPassword = await argon2_1.default.hash(options.password);
-        const user = em.create(User_1.User, { username: options.username, password: hashedPassword });
-        await em.persistAndFlush(user);
-        return user;
+        const user = em.create(User_1.User, {
+            username: options.username,
+            password: hashedPassword,
+        });
+        try {
+            await em.persistAndFlush(user);
+        }
+        catch (err) {
+            if (err.code === "23505") {
+                return {
+                    errors: [
+                        {
+                            field: "username",
+                            message: "username already taken",
+                        },
+                    ],
+                };
+            }
+        }
+        return { user };
     }
     async login(options, { em }) {
         const user = await em.findOne(User_1.User, { username: options.username });
         if (!user) {
             return {
-                errors: [{
+                errors: [
+                    {
                         field: "username",
-                        message: "that username doesn\'t exist",
+                        message: "that username doesn't exist",
                     },
                 ],
             };
@@ -79,17 +117,19 @@ let UserResolver = class UserResolver {
         const valid = await argon2_1.default.verify(user.password, options.password);
         if (!valid) {
             return {
-                errors: [{
+                errors: [
+                    {
                         field: "password",
-                        message: "Incorrect password"
-                    }],
+                        message: "Incorrect password",
+                    },
+                ],
             };
         }
         return { user };
     }
 };
 __decorate([
-    (0, type_graphql_1.Mutation)(() => User_1.User),
+    (0, type_graphql_1.Mutation)(() => UserResponse),
     __param(0, (0, type_graphql_1.Arg)("options")),
     __param(1, (0, type_graphql_1.Ctx)()),
     __metadata("design:type", Function),
